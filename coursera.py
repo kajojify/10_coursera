@@ -7,23 +7,19 @@ from bs4 import BeautifulSoup
 from openpyxl.workbook import Workbook
 
 
-def get_course_iter(courses_number=20, rand=True):
+def get_course_iter(courses_number=20):
     coursera_feed_url = "https://www.coursera.org/sitemap~www~courses.xml"
     xml_namespace = "http://www.sitemaps.org/schemas/sitemap/0.9"
     coursera_feed = requests.get(coursera_feed_url)
     if coursera_feed.status_code != 200:
         raise requests.HTTPError("HTTP request error!")
     tree = etree.XML(coursera_feed.content)
-    NS = {'ns': xml_namespace}
-    courses_url_list = tree.findall(".//ns:loc", namespaces=NS)
+    ns = {'ns': xml_namespace}
+    courses_url_list = tree.findall(".//ns:loc", namespaces=ns)
     all_course_number = len(courses_url_list)
-    if rand:
-        random_list = random.sample(range(all_course_number), courses_number)
-        for course_numb in random_list:
-            yield courses_url_list[course_numb].text
-    else:
-        for course_url in courses_url_list[:courses_number]:
-            yield course_url.text
+    random_list = random.sample(range(all_course_number), courses_number)
+    for course_numb in random_list:
+        yield courses_url_list[course_numb].text
 
 
 def get_course_info(course_url):
