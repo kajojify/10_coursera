@@ -6,15 +6,25 @@ from bs4 import BeautifulSoup
 from openpyxl.workbook import Workbook
 
 
-def get_course_iter(courses_number=20):
+def fetch_page(url, headers):
+    page = requests.get(url, headers)
+    return page.content
+
+
+def generate_rand_sequence(diapason, numbers_amount):
+    random_list = random.sample(diapason, numbers_amount)
+    return random_list
+
+
+def get_course_url_iter(courses_number=20):
     coursera_feed_url = "https://www.coursera.org/sitemap~www~courses.xml"
+    coursera_feed = fetch_page(coursera_feed_url, headers={})
+    tree = etree.XML(coursera_feed)
     xml_namespace = "http://www.sitemaps.org/schemas/sitemap/0.9"
-    coursera_feed = requests.get(coursera_feed_url)
-    tree = etree.XML(coursera_feed.content)
     ns = {'ns': xml_namespace}
     courses_url_list = tree.findall(".//ns:loc", namespaces=ns)
     all_course_number = len(courses_url_list)
-    random_list = random.sample(range(all_course_number), courses_number)
+    random_list = generate_rand_sequence(range(all_course_number), courses_number)
     for course_numb in random_list:
         yield courses_url_list[course_numb].text
 
@@ -26,8 +36,9 @@ def pretify_date(raw_date_string):
 
 def get_course_info(course_url):
     headers = {'accept-language': "ru-RU,ru;q=0.8,en-US;q=0.6,en;q=0.4"}
-    course_page = requests.get(course_url, headers=headers)
-    page_soup = BeautifulSoup(course_page.content, 'lxml')
+    course_page = fetch_page(course_url, headers=headers)
+
+    page_soup = BeautifulSoup(course_page, 'lxml')
 
     course_name = page_soup.find('h1', "title display-3-text").text
 
@@ -63,10 +74,10 @@ if __name__ == '__main__':
     xlsx_path = input("Enter the path to the xlsx file --- ")
     courses_base = []
     try:
-        for course_url in get_course_iter():
+        for course_url in get_course_url_iter():
             course_info = get_course_info(course_url)
             courses_base.append(course_info)
         output_courses_info_to_xlsx(xlsx_path, courses_base)
-    except (ValueError,FileNotFoundError) as error:
+    except (ValueError, FileNotFoundError) as error:
         print("Something went wrong!", error)
         exit("Exiting...")
