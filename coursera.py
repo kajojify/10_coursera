@@ -16,7 +16,7 @@ def parse_arguments():
 
 
 def fetch_page(url, headers):
-    page = requests.get(url, headers)
+    page = requests.get(url, headers=headers)
     return page.content
 
 
@@ -43,12 +43,13 @@ def pretify_date(raw_date_string):
     return date_string.capitalize()
 
 
-def pretify_info(course_info):
-    course = course_info.copy()
-    course['weeks'] = course['weeks'] if course['weeks'] else "No info"
-    course['mark'] = course['mark'].text if course['mark'] else "No info"
-    course['date'] = pretify_date(course['date'])
-    return course
+def pretify_info(course_name, course_lang, course_date,
+                 course_weeks_number, course_mark):
+    pretty_weeks = course_weeks_number if course_weeks_number else "No info"
+    pretty_mark = course_mark.text if course_mark else "No info"
+    pretty_date = pretify_date(course_date)
+    return (course_name, course_lang, pretty_date,
+            pretty_weeks, pretty_mark)
 
 
 def get_course_info(course_page):
@@ -65,33 +66,25 @@ def get_course_info(course_page):
 
     course_mark = page_soup.find('div', "ratings-text bt3-visible-xs")
 
-    course_info= {
-        'name': course_name,
-        'lang': course_lang,
-        'date': course_date,
-        'weeks': course_weeks_number,
-        'mark': course_mark
-    }
-    return pretify_info(course_info)
+    return pretify_info(course_name, course_lang, course_date,
+                        course_weeks_number, course_mark)
 
 
 def output_courses_info_to_xlsx(filepath, courses_base):
-    headers = ("Course name", "Language", "Start date",
-               "Weeks", "Average mark")
     wb = Workbook()
     sheet = wb.active
     sheet.title = "Coursera courses"
-    sheet.append(headers)
-    for course in courses_base:
-        sheet.append((course['name'], course['lang'], course['date'],
-                     course['weeks'], course['mark']))
+    for row in courses_base:
+        sheet.append(row)
     wb.save(filepath)
 
 if __name__ == '__main__':
+    course_headers = ("Course name", "Language", "Start date",
+                      "Weeks", "Average mark")
+    courses_base = [course_headers]
     headers = {'accept-language': "ru-RU,ru;q=0.8,en-US;q=0.6,en;q=0.4"}
     arguments = parse_arguments()
     xlsx_path = arguments.xlsx_path
-    courses_base = []
     try:
         for course_url in get_course_url_iter():
             course_page = fetch_page(course_url, headers=headers)
