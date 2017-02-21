@@ -1,9 +1,18 @@
 import requests
 import random
+import argparse
 
 from lxml import etree
 from bs4 import BeautifulSoup
 from openpyxl.workbook import Workbook
+
+
+def parse_arguments():
+    parser = argparse.ArgumentParser(description="Coursera courses to xlsx.")
+    parser.add_argument("xlsx_path", help="path to xlsx file for"
+                                          " writing courses info")
+    args = parser.parse_args()
+    return args
 
 
 def fetch_page(url, headers):
@@ -34,10 +43,15 @@ def pretify_date(raw_date_string):
     return date_string.capitalize()
 
 
-def get_course_info(course_url):
-    headers = {'accept-language': "ru-RU,ru;q=0.8,en-US;q=0.6,en;q=0.4"}
-    course_page = fetch_page(course_url, headers=headers)
+def pretify_info(course_info):
+    course = course_info.copy()
+    course['weeks'] = course['weeks'] if course['weeks'] else "No info"
+    course['mark'] = course['mark'].text if course['mark'] else "No info"
+    course['date'] = pretify_date(course['date'])
+    return course
 
+
+def get_course_info(course_page):
     page_soup = BeautifulSoup(course_page, 'lxml')
 
     course_name = page_soup.find('h1', "title display-3-text").text
@@ -46,17 +60,19 @@ def get_course_info(course_url):
 
     date_class = "startdate rc-StartDateString caption-text"
     course_date = page_soup.find('div', date_class).find('span').text
-    course_date = pretify_date(course_date)
 
-    week_elems_number = len(page_soup.findAll('div', "week"))
-    course_weeks_number = week_elems_number if week_elems_number else "No info"
+    course_weeks_number = len(page_soup.findAll('div', "week"))
 
-    mark_div = page_soup.find('div', "ratings-text bt3-visible-xs")
-    course_mark = mark_div.text if mark_div else "No info"
+    course_mark = page_soup.find('div', "ratings-text bt3-visible-xs")
 
-    course_info = (course_name, course_lang, course_date,
-                   course_weeks_number, course_mark)
-    return course_info
+    course_info= {
+        'name': course_name,
+        'lang': course_lang,
+        'date': course_date,
+        'weeks': course_weeks_number,
+        'mark': course_mark
+    }
+    return pretify_info(course_info)
 
 
 def output_courses_info_to_xlsx(filepath, courses_base):
@@ -67,15 +83,19 @@ def output_courses_info_to_xlsx(filepath, courses_base):
     sheet.title = "Coursera courses"
     sheet.append(headers)
     for course in courses_base:
-        sheet.append(course)
+        sheet.append((course['name'], course['lang'], course['date'],
+                     course['weeks'], course['mark']))
     wb.save(filepath)
 
 if __name__ == '__main__':
-    xlsx_path = input("Enter the path to the xlsx file --- ")
+    headers = {'accept-language': "ru-RU,ru;q=0.8,en-US;q=0.6,en;q=0.4"}
+    arguments = parse_arguments()
+    xlsx_path = arguments.xlsx_path
     courses_base = []
     try:
         for course_url in get_course_url_iter():
-            course_info = get_course_info(course_url)
+            course_page = fetch_page(course_url, headers=headers)
+            course_info = get_course_info(course_page)
             courses_base.append(course_info)
         output_courses_info_to_xlsx(xlsx_path, courses_base)
     except (ValueError, FileNotFoundError) as error:
